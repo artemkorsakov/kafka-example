@@ -1,36 +1,38 @@
 package com.github.artemkorsakov.app
 
-import java.util.{ Date, Properties }
+import java.util.Date
 
-import org.apache.kafka.clients.producer.{ KafkaProducer, ProducerRecord }
+import com.github.artemkorsakov.props.KafkaProperties.createKafkaProducer
+import kafka.utils.Logging
+import org.apache.kafka.clients.producer.ProducerRecord
 
-import scala.util.Random
+import scala.util.{ Failure, Random, Success, Using }
 
-object KafkaProducerApp extends App {
-  val events  = args(0).toInt
-  val topic   = args(1)
-  val brokers = args(2)
-  val rnd     = new Random()
-  val props   = new Properties()
-  props.put("bootstrap.servers", brokers)
-  props.put("client.id", "ScalaProducerExample")
-  props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
-  props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer")
+object KafkaProducerApp extends App with Logging {
+  if (args.length < 3)
+    logger.error("Must be three arguments: server, topic and count of messages")
+  else {
+    val topic = args(1)
+    val count = args(2).toInt
 
-  val producer = new KafkaProducer[String, String](props)
-  val t        = System.currentTimeMillis()
-  for (nEvents <- Range(0, events)) {
-    val runtime = new Date().getTime
-    val ip      = "192.168.2." + rnd.nextInt(255)
-    val msg     = runtime + "," + nEvents + ",www.example.com," + ip
-    val data    = new ProducerRecord[String, String](topic, ip, msg)
+    val time = System.currentTimeMillis()
+    Using(createKafkaProducer(args.head)) { producer =>
+      val rnd = new Random()
+      (0 to count).foreach { nEvents =>
+        val key    = s"192.168.2.${rnd.nextInt(255)}"
+        val value  = s"${new Date().getTime}, $nEvents, www.example.com, $key"
+        val record = new ProducerRecord(topic, key, value)
+        producer.send(record)
+        logger.info(s"message = $value")
+      }
+      producer.close()
+    } match {
+      case Success(_) =>
+        logger.info(s"sent per second: ${count * 1000 / (System.currentTimeMillis() - time)}")
+      case Failure(e) =>
+        logger.error(e.getMessage)
+    }
 
-    //async
-    //producer.send(data, (m,e) => {})
-    //sync
-    producer.send(data)
   }
 
-  System.out.println("sent per second: " + events * 1000 / (System.currentTimeMillis() - t))
-  producer.close()
 }

@@ -6,32 +6,32 @@ Install [Apache Kafka].
 
 ### start zookeeper
 ``` sh
-> bin/zookeeper-server-start.sh config/zookeeper.properties
+bin/zookeeper-server-start.sh config/zookeeper.properties
 ```
 
 ### start kafka
 ``` sh
-> bin/kafka-server-start.sh config/server.properties
+bin/kafka-server-start.sh config/server.properties
 ```
 
-### create a topic with name "quickstart-events"
+### create a topic with name "kafka-example"
 ``` sh
-> bin/kafka-topics.sh --create --topic quickstart-events --bootstrap-server localhost:9092
+bin/kafka-topics.sh --create --topic kafka-example --bootstrap-server localhost:9092 --replication-factor 1 --partitions 10
 ```
 
-### package this example
+### compile project
 ``` sh
-sbt assembly
+sbt clean compile
 ```
 
 ### Run the Producer
 ``` sh
-java -cp kafka_example-0.1.0-SNAPSHOT.jar com.colobu.kafka.ScalaProducerExample 10000 test_topic localhost:9092
+sbt "runMain com.github.artemkorsakov.app.KafkaProducerApp localhost:9092 kafka-example 10"
 ```
 
 ### Run the Consumer
 ``` sh
-java -cp kafka_example-0.1.0-SNAPSHOT.jar com.colobu.kafka.ScalaConsumerExample localhost:9092 group1 test_topic 10 0
+sbt "runMain com.github.artemkorsakov.app.KafkaConsumerApp localhost:9092 group1 kafka-example"
 ```
 
 [Apache Kafka]: https://kafka.apache.org/documentation/#quickstart

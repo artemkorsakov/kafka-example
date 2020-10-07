@@ -1,55 +1,26 @@
 package com.github.artemkorsakov.app
 
 import java.time.Duration
+import java.util.Collections
 import java.util.concurrent._
-import java.util.{ Collections, Properties }
 
+import com.github.artemkorsakov.props.KafkaProperties.createKafkaConsumer
 import kafka.utils.Logging
-import org.apache.kafka.clients.consumer.{ ConsumerConfig, KafkaConsumer }
 
-class KafkaConsumerApp(val brokers: String, val groupId: String, val topic: String) extends Logging {
-
-  val props: Properties                 = createConsumerConfig(brokers, groupId)
-  val consumer                          = new KafkaConsumer[String, String](props)
-  var executor: Option[ExecutorService] = None
-
-  def shutdown(): Unit = {
-    if (consumer != null)
-      consumer.close()
-    if (executor.isDefined)
-      executor.get.shutdown()
-  }
-
-  def createConsumerConfig(brokers: String, groupId: String): Properties = {
-    val props = new Properties()
-    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, brokers)
-    props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId)
-    props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true")
-    props.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "1000")
-    props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "30000")
-    props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer")
-    props.put(
-      ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-      "org.apache.kafka.common.serialization.StringDeserializer"
-    )
-    props
-  }
-
-  def run(): Unit = {
-    consumer.subscribe(Collections.singletonList(this.topic))
-
+object KafkaConsumerApp extends App with Logging {
+  if (args.length < 3)
+    logger.error("Must be three arguments: server, groupId and topic")
+  else {
+    val consumer = createKafkaConsumer(args.head, args(1))
+    val topic    = args(2)
+    consumer.subscribe(Collections.singletonList(topic))
     Executors.newSingleThreadExecutor.execute(() =>
       while (true) {
-        val records = consumer.poll(Duration.ofMillis(100))
+        val records = consumer.poll(Duration.ofMillis(500))
         records.forEach(record =>
-          println("Received message: (" + record.key() + ", " + record.value() + ") at offset " + record.offset())
+          logger.info(s"Received message: (${record.key}, ${record.value}) at offset ${record.offset}")
         )
       }
     )
   }
-}
-
-object ScalaConsumerExample extends App {
-  val example = new KafkaConsumerApp(args(0), args(1), args(2))
-  example.run()
 }
